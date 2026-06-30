@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@/lib/kv";
 
 /**
  * GET /api/auth?shop=xtrawine.myshopify.com
- * Entry point OAuth — redirige il merchant a Shopify per l'approvazione degli scope.
+ * Entry point OAuth — se il token esiste già, redirige direttamente all'Admin.
+ * Altrimenti avvia il flusso OAuth.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const shop = req.nextUrl.searchParams.get("shop");
   if (!shop || !shop.endsWith(".myshopify.com")) {
     return NextResponse.json({ error: "Parametro shop mancante o non valido" }, { status: 400 });
+  }
+
+  // Se già installata, non rifare OAuth
+  const existing = await kv.get(`shop:${shop}`);
+  if (existing) {
+    return NextResponse.redirect(`https://${shop}/admin`);
   }
 
   const clientId = process.env.SHOPIFY_CLIENT_ID!;
@@ -19,7 +27,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     "write_discounts",
   ].join(",");
 
-  // Nonce semplice basato su timestamp — sufficiente per una Custom App mono-merchant
   const state = Buffer.from(`${Date.now()}`).toString("hex");
 
   const authUrl =
