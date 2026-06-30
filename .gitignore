@@ -19,3 +19,9 @@ next-env.d.ts
 
 # OS
 .DS_Store
+
+# Documenti interni (non versionati)
+PROJECT_SCOPE.md
+INFRASTRUCTURE.md
+Business_Requirements_Xperience_V1_2.docx
+Business_Requirements_Xperience_V1_5.docx
