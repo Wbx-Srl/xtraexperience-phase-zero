@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { kv } from "@/lib/kv";
 import type { VoucherRecord } from "@/lib/voucher";
 
 // Rate limiting semplicistico in-memory (per Vercel serverless, usa Vercel KV in produzione)
