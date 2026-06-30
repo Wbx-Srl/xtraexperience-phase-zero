@@ -29,8 +29,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text();
-    console.error("OAuth token exchange failed:", body);
-    return NextResponse.json({ error: "Token exchange fallito" }, { status: 502 });
+    console.error("OAuth token exchange failed:", tokenRes.status, body);
+    return NextResponse.json(
+      { error: "Token exchange fallito", status: tokenRes.status, detail: body },
+      { status: 502 }
+    );
   }
 
   const { access_token, scope } = await tokenRes.json();
