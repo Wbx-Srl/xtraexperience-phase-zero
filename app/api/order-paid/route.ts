@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { kv } from "@/lib/kv";
 import { verifyShopifyHmac } from "@/lib/hmac";
 import {
@@ -55,15 +56,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 3. Risponde 200 SUBITO (Shopify richiede risposta entro 5s)
-  const response = NextResponse.json({ ok: true });
-
-  // 4. Processing asincrono (non bloccante per la risposta)
-  processOrder(shop, JSON.parse(rawBody.toString("utf-8")) as ShopifyOrder).catch(
-    (err) => console.error("order-paid processing error:", err)
+  // 3. Risponde 200 SUBITO — waitUntil mantiene la funzione viva fino al completamento
+  waitUntil(
+    processOrder(shop, JSON.parse(rawBody.toString("utf-8")) as ShopifyOrder).catch(
+      (err) => console.error("order-paid processing error:", err)
+    )
   );
 
-  return response;
+  return NextResponse.json({ ok: true });
 }
 
 // ── Processing ordine ─────────────────────────────────────────────────────────
