@@ -123,7 +123,7 @@ export async function createCrossSellingDiscount(
         price_rule: {
           title: discountCode,
           target_type: "line_item",
-          target_selection: "entitled",
+          target_selection: "all",
           allocation_method: "across",
           value_type: "percentage",
           value: "-10.0",
@@ -132,10 +132,6 @@ export async function createCrossSellingDiscount(
           ends_at: endsAt,
           usage_limit: 1,
           once_per_customer: true,
-          entitled_product_ids: [],
-          prerequisite_vendor_ids: [],
-          // Limita ai prodotti del vendor (cantina)
-          prerequisite_subtotal_range: null,
         },
       }),
     }

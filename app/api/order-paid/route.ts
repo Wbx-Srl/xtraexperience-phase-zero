@@ -96,12 +96,13 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
     order.line_items.map((i) => `[${i.id}] "${i.product_type}"`).join(", ")
   );
 
-  // Arricchisci product_type dai dati prodotto se il webhook lo manda vuoto
+  // Arricchisci product_type dai dati prodotto se il webhook lo manda vuoto/assente
   const enrichedItems = await Promise.all(
     order.line_items.map(async (item) => {
-      if (item.product_type) return item;
-      const pt = await getProductType(shop, accessToken, item.product_id);
-      return { ...item, product_type: pt };
+      const pt = item.product_type || "";
+      if (pt) return item;
+      const fetched = await getProductType(shop, accessToken, item.product_id);
+      return { ...item, product_type: fetched };
     })
   );
 
