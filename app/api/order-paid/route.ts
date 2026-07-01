@@ -4,6 +4,7 @@ import { kv } from "@/lib/kv";
 import { verifyShopifyHmac } from "@/lib/hmac";
 import {
   getProductMetafields,
+  getProductType,
   writeOrderMetafield,
   createCrossSellingDiscount,
 } from "@/lib/shopify";
@@ -89,12 +90,31 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
   // Imposta flag con TTL 30 giorni
   await kv.set(orderKey, "1", { ex: 30 * 24 * 60 * 60 });
 
-  // 6. Flag has_wine (ordine misto)
-  const hasWine = order.line_items.some(
+  // 6. Log diagnostico + risoluzione product_type via API se vuoto nel webhook
+  console.log(
+    `Ordine ${orderId} line_items product_types (raw):`,
+    order.line_items.map((i) => `[${i.id}] "${i.product_type}"`).join(", ")
+  );
+
+  // Arricchisci product_type dai dati prodotto se il webhook lo manda vuoto
+  const enrichedItems = await Promise.all(
+    order.line_items.map(async (item) => {
+      if (item.product_type) return item;
+      const pt = await getProductType(shop, accessToken, item.product_id);
+      return { ...item, product_type: pt };
+    })
+  );
+
+  console.log(
+    `Ordine ${orderId} line_items product_types (enriched):`,
+    enrichedItems.map((i) => `[${i.id}] "${i.product_type}"`).join(", ")
+  );
+
+  const hasWine = enrichedItems.some(
     (i) => i.product_type !== EXPERIENCE_PRODUCT_TYPE
   );
 
-  const experienceItems = order.line_items.filter(
+  const experienceItems = enrichedItems.filter(
     (i) => i.product_type === EXPERIENCE_PRODUCT_TYPE
   );
 

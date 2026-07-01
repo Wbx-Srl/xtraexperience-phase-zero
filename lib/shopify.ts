@@ -55,6 +55,19 @@ export async function getProductMetafields(
   };
 }
 
+// ── Tipo prodotto (fallback quando product_type è vuoto nel webhook) ────────────
+
+export async function getProductType(
+  shop: string,
+  accessToken: string,
+  productId: string
+): Promise<string> {
+  const res = await shopifyFetch(shop, accessToken, `products/${productId}.json?fields=product_type`);
+  if (!res.ok) return "";
+  const data = await res.json();
+  return (data.product?.product_type as string) ?? "";
+}
+
 // ── Metafield ordine ──────────────────────────────────────────────────────────
 
 export async function writeOrderMetafield(
