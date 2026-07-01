@@ -235,6 +235,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
           discount_description: discountDescription,
           payment_gateway: order.payment_gateway,
         });
+        console.log(`Klaviyo VoucherGenerated inviato per ${code} → ${customerEmail}`);
 
         if (meta.cantina_email) {
           await trackVoucherSold(klaviyoKey, meta.cantina_email, {
