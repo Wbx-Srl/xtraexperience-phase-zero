@@ -142,11 +142,18 @@ export async function createCrossSellingDiscount(
   );
 
   if (!priceRuleRes.ok) {
-    // Non bloccare il flusso principale se il discount fallisce
-    console.error(
-      `Price rule creation failed for ${discountCode}:`,
-      await priceRuleRes.text()
-    );
+    const errBody = await priceRuleRes.text();
+    // Scope mancante → log esplicito per diagnostica
+    if (errBody.includes("write_price_rules")) {
+      console.error(
+        `[SCOPE MANCANTE] write_price_rules non autorizzato. ` +
+        `Aggiungi lo scope in Partner Dashboard e reinstalla l'app. ` +
+        `Dettagli: ${errBody}`
+      );
+    } else {
+      console.error(`Price rule creation failed for ${discountCode}: ${errBody}`);
+    }
+    // Non bloccare il flusso principale
     return;
   }
 
