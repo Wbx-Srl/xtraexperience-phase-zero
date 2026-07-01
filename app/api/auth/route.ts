@@ -25,6 +25,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     "write_orders",
     "read_products",
     "write_discounts",
+    "write_price_rules",
   ].join(",");
 
   const state = Buffer.from(`${Date.now()}`).toString("hex");
