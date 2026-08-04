@@ -2,7 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@/lib/kv";
 import type { VoucherRecord } from "@/lib/voucher";
 
-// Rate limiting semplicistico in-memory (per Vercel serverless, usa Vercel KV in produzione)
+const ALLOWED_ORIGINS = ["https://xtrawine.com", "https://xtrawine.myshopify.com"];
+
+function corsHeaders(req: NextRequest): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
+export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
+}
+
+// Rate limiting semplicistico in-memory
 const rateLimitMap = new Map<string, { count: number; reset: number }>();
 
 function checkRateLimit(ip: string, maxPerMin = 20): boolean {
@@ -50,5 +66,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     url_experience: voucher.url_experience,
     status: voucher.status,
     expires_at: voucher.expires_at,
-  });
+  }, { headers: corsHeaders(req) });
 }
