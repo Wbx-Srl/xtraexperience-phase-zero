@@ -67,6 +67,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     code: voucher.code,
     cantina_name: voucher.cantina_name,
     experience_name: voucher.experience_name,
+    image_url: voucher.image_url ?? "",
     url_experience: voucher.url_experience,
     status: voucher.status,
     expires_at: voucher.expires_at,

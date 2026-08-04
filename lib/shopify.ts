@@ -68,6 +68,19 @@ export async function getProductType(
   return (data.product?.product_type as string) ?? "";
 }
 
+// ── Immagine prodotto (per il box "prodotto acquistato" nel modal voucher) ────
+
+export async function getProductImage(
+  shop: string,
+  accessToken: string,
+  productId: string
+): Promise<string> {
+  const res = await shopifyFetch(shop, accessToken, `products/${productId}.json?fields=image`);
+  if (!res.ok) return "";
+  const data = await res.json();
+  return (data.product?.image?.src as string) ?? "";
+}
+
 // ── Metafield ordine ──────────────────────────────────────────────────────────
 
 export async function writeOrderMetafield(

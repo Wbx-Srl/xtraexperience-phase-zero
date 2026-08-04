@@ -66,6 +66,7 @@ export interface VoucherRecord {
   cantina_name: string;
   cantina_email: string;
   experience_name: string;
+  image_url: string;
   url_experience: string;
   instructions: string;
   discount_code: string;

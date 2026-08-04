@@ -5,6 +5,7 @@ import { verifyShopifyHmac } from "@/lib/hmac";
 import {
   getProductMetafields,
   getProductType,
+  getProductImage,
   writeOrderMetafield,
   createCrossSellingDiscount,
 } from "@/lib/shopify";
@@ -151,6 +152,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
 
       // c-f. Leggi metafield prodotto
       const meta = await getProductMetafields(shop, accessToken, item.product_id);
+      const imageUrl = await getProductImage(shop, accessToken, item.product_id);
 
       // g. Genera codice sconto cross-selling (uno per ordine per cantina, non per voucher)
       const discountCode = generateDiscountCode(meta.cantina_name, orderId, salt);
@@ -179,6 +181,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         cantina_name: meta.cantina_name,
         cantina_email: meta.cantina_email,
         experience_name: item.title,
+        image_url: imageUrl,
         url_experience: meta.url,
         instructions: meta.instructions,
         discount_code: discountCode,
