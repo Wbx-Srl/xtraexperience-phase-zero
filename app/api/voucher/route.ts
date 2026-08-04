@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@/lib/kv";
 import type { VoucherRecord } from "@/lib/voucher";
 
-const ALLOWED_ORIGINS = ["https://xtrawine.com", "https://xtrawine.myshopify.com"];
+const ALLOWED_ORIGINS = [
+  "https://xtrawine.com",
+  "https://www.xtrawine.com",
+  "https://xtrawine.myshopify.com",
+];
 
 function corsHeaders(req: NextRequest): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
