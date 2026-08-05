@@ -16,7 +16,25 @@ import { trackVoucherGenerated, trackVoucherSold } from "@/lib/klaviyo";
 const EXPERIENCE_PRODUCT_TYPE = process.env.EXPERIENCE_PRODUCT_TYPE ?? "Experience";
 const PAYPAL_DELAY_MS = parseInt(process.env.PAYPAL_DELAY_MINUTES ?? "30") * 60 * 1000;
 const DISCOUNT_VALIDITY_DAYS = parseInt(process.env.DISCOUNT_VALIDITY_DAYS ?? "30");
+const DEFAULT_VOUCHER_VALIDITY_MONTHS = parseInt(
+  process.env.DEFAULT_VOUCHER_VALIDITY_MONTHS ?? "12"
+);
 const APP_BASE_URL = process.env.APP_BASE_URL!;
+
+/**
+ * Data di scadenza voucher = oggi + N mesi, N da
+ * xtrawine.xpVoucherValidityMonths del prodotto (fallback:
+ * DEFAULT_VOUCHER_VALIDITY_MONTHS se il metafield manca o non è un numero
+ * valido > 0).
+ */
+function calculateVoucherExpiry(validityMonthsRaw: string): string {
+  const parsed = parseInt(validityMonthsRaw, 10);
+  const months =
+    Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_VOUCHER_VALIDITY_MONTHS;
+  const expiry = new Date();
+  expiry.setMonth(expiry.getMonth() + months);
+  return expiry.toISOString();
+}
 
 // ── Tipi Shopify ──────────────────────────────────────────────────────────────
 
@@ -170,9 +188,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       }
 
       const generatedAt = new Date().toISOString();
-      const expiresAt = new Date(
-        Date.now() + 365 * 24 * 60 * 60 * 1000
-      ).toISOString(); // 1 anno
+      const expiresAt = calculateVoucherExpiry(meta.validity_months);
 
       const voucher: VoucherRecord = {
         line_item_id: String(lineItemKey),
@@ -181,6 +197,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         cantina_name: meta.cantina_name,
         cantina_email: meta.cantina_email,
         cantina_phone: meta.cantina_phone,
+        cantina_address: meta.cantina_address,
         experience_name: item.title,
         image_url: imageUrl,
         url_experience: meta.url,

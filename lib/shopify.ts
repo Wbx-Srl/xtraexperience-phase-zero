@@ -29,6 +29,8 @@ export interface ProductMetafields {
   cantina_name: string;
   cantina_email: string;
   cantina_phone: string;
+  cantina_address: string;
+  validity_months: string;
   instructions: string;
 }
 
@@ -74,6 +76,8 @@ export async function getProductMetafields(
     cantina_name: mf["cantina_name"] ?? "",
     cantina_email: xtrawineMf["xpBookingEMail"] ?? "",
     cantina_phone: xtrawineMf["xpBookingPhone"] ?? "",
+    cantina_address: xtrawineMf["xpAddress"] ?? "",
+    validity_months: xtrawineMf["xpVoucherValidityMonths"] ?? "",
     instructions: mf["instructions"] ?? "",
   };
 }

@@ -70,6 +70,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     cantina_name: voucher.cantina_name,
     cantina_email: voucher.cantina_email ?? "",
     cantina_phone: voucher.cantina_phone ?? "",
+    cantina_address: voucher.cantina_address ?? "",
     experience_name: voucher.experience_name,
     image_url: voucher.image_url ?? "",
     url_experience: voucher.url_experience,
