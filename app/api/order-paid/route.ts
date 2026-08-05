@@ -180,6 +180,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         code,
         cantina_name: meta.cantina_name,
         cantina_email: meta.cantina_email,
+        cantina_phone: meta.cantina_phone,
         experience_name: item.title,
         image_url: imageUrl,
         url_experience: meta.url,

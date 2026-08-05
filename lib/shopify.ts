@@ -28,6 +28,7 @@ export interface ProductMetafields {
   url: string;
   cantina_name: string;
   cantina_email: string;
+  cantina_phone: string;
   instructions: string;
 }
 
@@ -36,21 +37,43 @@ export async function getProductMetafields(
   accessToken: string,
   productId: string
 ): Promise<ProductMetafields> {
-  const res = await shopifyFetch(
-    shop,
-    accessToken,
-    `products/${productId}/metafields.json?namespace=xw_experience`
-  );
-  if (!res.ok) throw new Error(`Metafield fetch failed: ${res.status}`);
-  const data = await res.json();
+  // cantina_name/url/instructions live in the xw_experience namespace
+  // (dedicated to this app); booking email/phone are theme-wide fields
+  // already used across the Xperience PDP, under the xtrawine namespace
+  // (xtrawine.xpBookingEMail / xtrawine.xpBookingPhone) — two separate
+  // namespaces, fetched in parallel.
+  const [experienceRes, xtrawineRes] = await Promise.all([
+    shopifyFetch(
+      shop,
+      accessToken,
+      `products/${productId}/metafields.json?namespace=xw_experience`
+    ),
+    shopifyFetch(
+      shop,
+      accessToken,
+      `products/${productId}/metafields.json?namespace=xtrawine`
+    ),
+  ]);
+  if (!experienceRes.ok) throw new Error(`Metafield fetch failed: ${experienceRes.status}`);
+  const data = await experienceRes.json();
   const mf: Record<string, string> = {};
   for (const m of data.metafields ?? []) {
     mf[m.key] = m.value;
   }
+
+  const xtrawineMf: Record<string, string> = {};
+  if (xtrawineRes.ok) {
+    const xtrawineData = await xtrawineRes.json();
+    for (const m of xtrawineData.metafields ?? []) {
+      xtrawineMf[m.key] = m.value;
+    }
+  }
+
   return {
     url: mf["url"] ?? "",
     cantina_name: mf["cantina_name"] ?? "",
-    cantina_email: mf["cantina_email"] ?? "",
+    cantina_email: xtrawineMf["xpBookingEMail"] ?? "",
+    cantina_phone: xtrawineMf["xpBookingPhone"] ?? "",
     instructions: mf["instructions"] ?? "",
   };
 }

@@ -62,10 +62,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Codice non trovato" }, { status: 404 });
   }
 
-  // Risposta pubblica — no PII
+  // Risposta pubblica — no PII del cliente. cantina_email/cantina_phone sono
+  // dati di contatto pubblici della cantina (non del cliente), esposti
+  // apposta: il cliente deve poterli usare per prenotare la sua esperienza.
   return NextResponse.json({
     code: voucher.code,
     cantina_name: voucher.cantina_name,
+    cantina_email: voucher.cantina_email ?? "",
+    cantina_phone: voucher.cantina_phone ?? "",
     experience_name: voucher.experience_name,
     image_url: voucher.image_url ?? "",
     url_experience: voucher.url_experience,
