@@ -246,7 +246,11 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         await trackVoucherGenerated(klaviyoKey, customerEmail, {
           code,
           cantina_name: meta.cantina_name,
+          cantina_email: meta.cantina_email,
+          cantina_phone: meta.cantina_phone,
+          cantina_address: meta.cantina_address,
           experience_name: item.title,
+          image_url: imageUrl,
           url_experience: meta.url,
           expires_at: expiresAt,
           qr_url: qrUrl,

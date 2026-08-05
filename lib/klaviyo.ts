@@ -38,7 +38,11 @@ async function trackEvent(
 export interface VoucherGeneratedPayload extends Record<string, string> {
   code: string;
   cantina_name: string;
+  cantina_email: string;
+  cantina_phone: string;
+  cantina_address: string;
   experience_name: string;
+  image_url: string;
   url_experience: string;
   expires_at: string;
   qr_url: string;
