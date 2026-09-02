@@ -57,6 +57,10 @@ interface ShopifyOrder {
   created_at: string;
 }
 
+function normalizeLineItemId(lineItemId: string): string {
+  return lineItemId.replace(/-\d+$/, "");
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 /**
@@ -218,7 +222,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       await kv.set(liKey, "1", { ex: 30 * 24 * 60 * 60 });
 
       orderVoucherSummaries.push({
-        line_item_id: String(lineItemKey),
+        line_item_id: normalizeLineItemId(String(lineItemKey)),
         code,
         cantina_name: meta.cantina_name,
         experience_name: item.title,
@@ -227,7 +231,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       });
 
       voucherRecordsForMetafield.push({
-        line_item_id: String(lineItemKey),
+        line_item_id: normalizeLineItemId(String(lineItemKey)),
         code,
         cantina: meta.cantina_name,
         url_experience: meta.url,
