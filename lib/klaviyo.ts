@@ -4,7 +4,8 @@ async function trackEvent(
   apiKey: string,
   email: string,
   eventName: string,
-  properties: Record<string, string>
+  properties: Record<string, string>,
+  uniqueId: string
 ): Promise<void> {
   const res = await fetch(KLAVIYO_API_URL, {
     method: "POST",
@@ -23,6 +24,7 @@ async function trackEvent(
           profile: {
             data: { type: "profile", attributes: { email } },
           },
+          unique_id: uniqueId,
           properties,
         },
       },
@@ -71,7 +73,13 @@ export async function trackVoucherGenerated(
   customerEmail: string,
   payload: VoucherGeneratedPayload
 ): Promise<void> {
-  await trackEvent(apiKey, customerEmail, "Voucher Generated", payload);
+  await trackEvent(
+    apiKey,
+    customerEmail,
+    "Voucher Generated",
+    payload,
+    `voucher-generated-${payload.code}`
+  );
 }
 
 /**
@@ -82,5 +90,11 @@ export async function trackVoucherSold(
   cantinaEmail: string,
   payload: VoucherSoldPayload
 ): Promise<void> {
-  await trackEvent(apiKey, cantinaEmail, "Voucher Sold", payload);
+  await trackEvent(
+    apiKey,
+    cantinaEmail,
+    "Voucher Sold",
+    payload,
+    `voucher-sold-${payload.code}`
+  );
 }

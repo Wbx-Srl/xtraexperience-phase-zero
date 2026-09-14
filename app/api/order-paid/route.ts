@@ -20,6 +20,16 @@ const DEFAULT_VOUCHER_VALIDITY_MONTHS = parseInt(
   process.env.DEFAULT_VOUCHER_VALIDITY_MONTHS ?? "12"
 );
 const APP_BASE_URL = process.env.APP_BASE_URL!;
+// Scaglionamento tra invii Klaviyo multipli nello stesso ordine (es. quantity > 1
+// sullo stesso voucher): mitiga un caso osservato sull'ordine SH-511530 in cui,
+// su 2 voucher generati a ~700ms di distanza, solo il primo evento "Voucher
+// Generated" risultava arrivato in Klaviyo (causa non confermabile con certezza,
+// log Vercel storici non disponibili senza piano a pagamento).
+const VOUCHER_EMAIL_STAGGER_MS = 1500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Data di scadenza voucher = oggi + N mesi, N da
@@ -156,6 +166,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
 
   const orderVoucherSummaries: OrderVoucherSummary[] = [];
   const voucherRecordsForMetafield: object[] = [];
+  let voucherIndex = 0; // scaglionamento invii Klaviyo tra tutti i voucher dell'ordine
 
   // 7. Loop line_items experience
   for (const item of experienceItems) {
@@ -278,15 +289,29 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         }
       };
 
+      // Scaglia i voucher successivi al primo dello stesso ordine, per evitare
+      // chiamate quasi simultanee alla Events API di Klaviyo (vedi nota su
+      // VOUCHER_EMAIL_STAGGER_MS sopra).
+      const staggerMs = voucherIndex * VOUCHER_EMAIL_STAGGER_MS;
+      voucherIndex++;
+
       if (isPaypal && PAYPAL_DELAY_MS > 0) {
         // Ritardo anti-frode PayPal: non blocca il loop, si esegue in background
         setTimeout(() => {
           sendEmails().catch((e) =>
             console.error(`Klaviyo delayed send failed for ${code}:`, e)
           );
-        }, PAYPAL_DELAY_MS);
+        }, PAYPAL_DELAY_MS + staggerMs);
       } else {
-        await sendEmails();
+        if (staggerMs > 0) await sleep(staggerMs);
+        // Isolato in try/catch: un errore Klaviyo per questo voucher non deve
+        // interrompere il resto del loop (voucher successivi, metafield ordine,
+        // KV summary) — solo loggato, per essere diagnosticabile nei log Vercel.
+        try {
+          await sendEmails();
+        } catch (e) {
+          console.error(`Klaviyo send failed for voucher ${code}:`, e);
+        }
       }
     }
   }
