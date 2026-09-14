@@ -271,6 +271,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
           qr_url: qrUrl,
           order_number: orderNumber,
           instructions: meta.instructions,
+          driving_directions: meta.driving_directions,
           discount_code: discountCode,
           discount_description: discountDescription,
           payment_gateway: order.payment_gateway,

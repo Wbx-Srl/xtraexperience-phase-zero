@@ -32,6 +32,7 @@ export interface ProductMetafields {
   cantina_address: string;
   validity_months: string;
   instructions: string;
+  driving_directions: string;
 }
 
 export async function getProductMetafields(
@@ -73,12 +74,13 @@ export async function getProductMetafields(
 
   return {
     url: mf["url"] ?? "",
-    cantina_name: mf["cantina_name"] ?? "",
+    cantina_name: xtrawineMf["xpWineryName"] ?? "",
     cantina_email: xtrawineMf["xpBookingEMail"] ?? "",
     cantina_phone: xtrawineMf["xpBookingPhone"] ?? "",
     cantina_address: xtrawineMf["xpAddress"] ?? "",
     validity_months: xtrawineMf["xpVoucherValidityMonths"] ?? "",
-    instructions: mf["instructions"] ?? "",
+    instructions: xtrawineMf["xpBookingInstructions"] ?? "",
+    driving_directions: xtrawineMf["xpDrivingDirections"] ?? "",
   };
 }
 
