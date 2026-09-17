@@ -51,6 +51,7 @@ export interface VoucherGeneratedPayload extends Record<string, string> {
   order_number: string;
   instructions: string;
   driving_directions: string;
+  referrer: string;
   discount_code: string;
   discount_description: string;
   payment_gateway: string;

@@ -33,6 +33,7 @@ export interface ProductMetafields {
   validity_months: string;
   instructions: string;
   driving_directions: string;
+  referrer: string;
 }
 
 export async function getProductMetafields(
@@ -81,6 +82,7 @@ export async function getProductMetafields(
     validity_months: xtrawineMf["xpVoucherValidityMonths"] ?? "",
     instructions: xtrawineMf["xpBookingInstructions"] ?? "",
     driving_directions: xtrawineMf["xpDrivingDirections"] ?? "",
+    referrer: xtrawineMf["xpBookingReferrer"] ?? "",
   };
 }
 
