@@ -48,18 +48,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { error: "Troppe richieste. Riprova tra un minuto." },
-      { status: 429 }
+      { status: 429, headers: corsHeaders(req) }
     );
   }
 
   const code = req.nextUrl.searchParams.get("code")?.toUpperCase().trim();
   if (!code) {
-    return NextResponse.json({ error: "Parametro code mancante" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Parametro code mancante" },
+      { status: 400, headers: corsHeaders(req) }
+    );
   }
 
   const voucher = await kv.get<VoucherRecord>(`voucher:${code}`);
   if (!voucher) {
-    return NextResponse.json({ error: "Codice non trovato" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Codice non trovato" },
+      { status: 404, headers: corsHeaders(req) }
+    );
   }
 
   // Risposta pubblica — no PII del cliente. cantina_email/cantina_phone sono
