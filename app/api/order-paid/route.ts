@@ -46,6 +46,19 @@ function calculateVoucherExpiry(validityMonthsRaw: string): string {
   return expiry.toISOString();
 }
 
+/**
+ * Formatta una data ISO come dd/MM/yyyy per il payload evento Klaviyo
+ * (email al cliente/cantina) — lo storage interno (KV, metafield ordine,
+ * ERP) resta in ISO 8601, solo il testo mostrato nell'email cambia formato.
+ */
+function formatExpiryDateForEmail(isoString: string): string {
+  const d = new Date(isoString);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 // ── Tipi Shopify ──────────────────────────────────────────────────────────────
 
 interface ShopifyLineItem {
@@ -60,6 +73,7 @@ interface ShopifyLineItem {
 interface ShopifyOrder {
   id: string;
   order_number: number;
+  name: string;
   email: string;
   customer?: { first_name?: string; last_name?: string; email?: string };
   line_items: ShopifyLineItem[];
@@ -157,7 +171,10 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
     return;
   }
 
-  const orderNumber = `#${order.order_number}`;
+  // order.name è il numero ordine formattato ufficiale di Shopify (rispetta
+  // eventuale prefisso custom configurato in Admin, es. "SH-123456"),
+  // preferito a ricostruirlo a mano da order_number (che darebbe solo "#123456")
+  const orderNumber = order.name;
   const customerEmail = order.customer?.email ?? order.email;
   const customerName = [order.customer?.first_name, order.customer?.last_name]
     .filter(Boolean)
@@ -267,7 +284,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
           experience_name: item.title,
           image_url: imageUrl,
           url_experience: meta.url,
-          expires_at: expiresAt,
+          expires_at: formatExpiryDateForEmail(expiresAt),
           qr_url: qrUrl,
           order_number: orderNumber,
           instructions: meta.instructions,
@@ -285,7 +302,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
             customer_email: customerEmail,
             experience_name: item.title,
             order_number: orderNumber,
-            expires_at: expiresAt,
+            expires_at: formatExpiryDateForEmail(expiresAt),
           });
         }
       };
