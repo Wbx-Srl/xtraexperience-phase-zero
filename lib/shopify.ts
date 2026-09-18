@@ -145,9 +145,14 @@ export async function writeOrderMetafield(
 // ── Discount Code (cross-selling) ─────────────────────────────────────────────
 
 /**
- * Risolve gli id dei prodotti Shopify con un dato vendor (cantina).
- * REST pagina a 250 risultati: nessuna cantina dovrebbe superarli, ma se
- * succede logghiamo un warning per visibilita' invece di troncare in silenzio.
+ * Risolve gli id dei prodotti VINO (product_type=Wines) di un dato vendor
+ * (cantina) - esclude Xperience/Olio/Food/altri tipi dello stesso vendor,
+ * che altrimenti risulterebbero idonei allo sconto cross-selling insieme
+ * al vino. Filtrato anche perche' l'API price_rules.json di Shopify ha un
+ * limite HARD di 100 entitled_product_ids (non 250 come il paging REST) -
+ * una cantina con >100 referenze vino avrebbe altrimenti fatto fallire la
+ * creazione del price rule (visto in produzione con Tasca d'Almerita, 209
+ * prodotti totali di vendor prima del filtro per tipo).
  */
 async function getVendorProductIds(
   shop: string,
@@ -157,18 +162,19 @@ async function getVendorProductIds(
   const res = await shopifyFetch(
     shop,
     accessToken,
-    `products.json?vendor=${encodeURIComponent(vendor)}&limit=250&fields=id`
+    `products.json?vendor=${encodeURIComponent(vendor)}&product_type=${encodeURIComponent("Wines")}&limit=100&fields=id`
   );
   if (!res.ok) {
-    console.error(`Lookup prodotti per vendor "${vendor}" fallito: ${res.status}`);
+    console.error(`Lookup vini per vendor "${vendor}" fallito: ${res.status}`);
     return [];
   }
   const data = await res.json();
   const products = (data.products ?? []) as { id: number }[];
-  if (products.length === 250) {
+  if (products.length === 100) {
     console.error(
-      `[POSSIBILE TRONCAMENTO] vendor "${vendor}" ha >= 250 prodotti, ` +
-      `serve paginazione per includerli tutti nello sconto cross-selling.`
+      `[POSSIBILE TRONCAMENTO] vendor "${vendor}" ha >= 100 vini, oltre il ` +
+      `limite entitled_product_ids di Shopify - sconto creato solo sui ` +
+      `primi 100, serve entitled_collection_ids per coprirli tutti.`
     );
   }
   return products.map((p) => p.id);
