@@ -145,14 +145,16 @@ export async function writeOrderMetafield(
 // ── Discount Code (cross-selling) ─────────────────────────────────────────────
 
 /**
- * Risolve gli id dei prodotti VINO (product_type=Wines) di un dato vendor
- * (cantina) - esclude Xperience/Olio/Food/altri tipi dello stesso vendor,
- * che altrimenti risulterebbero idonei allo sconto cross-selling insieme
- * al vino. Filtrato anche perche' l'API price_rules.json di Shopify ha un
- * limite HARD di 100 entitled_product_ids (non 250 come il paging REST) -
- * una cantina con >100 referenze vino avrebbe altrimenti fatto fallire la
- * creazione del price rule (visto in produzione con Tasca d'Almerita, 209
- * prodotti totali di vendor prima del filtro per tipo).
+ * Risolve gli id dei prodotti VINO ATTIVI (product_type=Wines, status=active)
+ * di un dato vendor (cantina) - esclude Xperience/Olio/Food/altri tipi dello
+ * stesso vendor, che altrimenti risulterebbero idonei allo sconto
+ * cross-selling insieme al vino, ed esclude prodotti draft/archiviati (non
+ * acquistabili, inutili nello sconto). Filtrato anche perche' l'API
+ * price_rules.json di Shopify ha un limite HARD di 100 entitled_product_ids
+ * (non 250 come il paging REST) - una cantina con >100 referenze vino
+ * avrebbe altrimenti fatto fallire la creazione del price rule (visto in
+ * produzione con Tasca d'Almerita, 209 prodotti totali di vendor prima del
+ * filtro per tipo).
  */
 async function getVendorProductIds(
   shop: string,
@@ -162,7 +164,7 @@ async function getVendorProductIds(
   const res = await shopifyFetch(
     shop,
     accessToken,
-    `products.json?vendor=${encodeURIComponent(vendor)}&product_type=${encodeURIComponent("Wines")}&limit=100&fields=id`
+    `products.json?vendor=${encodeURIComponent(vendor)}&product_type=${encodeURIComponent("Wines")}&status=active&limit=100&fields=id`
   );
   if (!res.ok) {
     console.error(`Lookup vini per vendor "${vendor}" fallito: ${res.status}`);
