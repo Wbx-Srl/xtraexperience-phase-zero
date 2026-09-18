@@ -144,17 +144,58 @@ export async function writeOrderMetafield(
 
 // ── Discount Code (cross-selling) ─────────────────────────────────────────────
 
+/**
+ * Risolve gli id dei prodotti Shopify con un dato vendor (cantina).
+ * REST pagina a 250 risultati: nessuna cantina dovrebbe superarli, ma se
+ * succede logghiamo un warning per visibilita' invece di troncare in silenzio.
+ */
+async function getVendorProductIds(
+  shop: string,
+  accessToken: string,
+  vendor: string
+): Promise<number[]> {
+  const res = await shopifyFetch(
+    shop,
+    accessToken,
+    `products.json?vendor=${encodeURIComponent(vendor)}&limit=250&fields=id`
+  );
+  if (!res.ok) {
+    console.error(`Lookup prodotti per vendor "${vendor}" fallito: ${res.status}`);
+    return [];
+  }
+  const data = await res.json();
+  const products = (data.products ?? []) as { id: number }[];
+  if (products.length === 250) {
+    console.error(
+      `[POSSIBILE TRONCAMENTO] vendor "${vendor}" ha >= 250 prodotti, ` +
+      `serve paginazione per includerli tutti nello sconto cross-selling.`
+    );
+  }
+  return products.map((p) => p.id);
+}
+
 export async function createCrossSellingDiscount(
   shop: string,
   accessToken: string,
   discountCode: string,
-  cantinaName: string,
+  vendor: string,
   validityDays: number
 ): Promise<void> {
   const startsAt = new Date().toISOString();
   const endsAt = new Date(
     Date.now() + validityDays * 24 * 60 * 60 * 1000
   ).toISOString();
+
+  // Limita lo sconto ai soli prodotti della cantina (stesso vendor Shopify
+  // del prodotto Xperience acquistato) - prima era target_selection:"all",
+  // valido su tutto il catalogo.
+  const entitledProductIds = await getVendorProductIds(shop, accessToken, vendor);
+  if (entitledProductIds.length === 0) {
+    console.error(
+      `Nessun prodotto trovato per vendor "${vendor}" - sconto cross-selling non creato.`
+    );
+    return;
+  }
 
   // Crea price rule
   const priceRuleRes = await shopifyFetch(
@@ -167,7 +208,8 @@ export async function createCrossSellingDiscount(
         price_rule: {
           title: discountCode,
           target_type: "line_item",
-          target_selection: "all",
+          target_selection: "entitled",
+          entitled_product_ids: entitledProductIds,
           allocation_method: "across",
           value_type: "percentage",
           value: "-10.0",

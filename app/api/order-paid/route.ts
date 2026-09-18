@@ -15,7 +15,7 @@ import { trackVoucherGenerated, trackVoucherSold } from "@/lib/klaviyo";
 
 const EXPERIENCE_PRODUCT_TYPE = process.env.EXPERIENCE_PRODUCT_TYPE ?? "Experience";
 const PAYPAL_DELAY_MS = parseInt(process.env.PAYPAL_DELAY_MINUTES ?? "30") * 60 * 1000;
-const DISCOUNT_VALIDITY_DAYS = parseInt(process.env.DISCOUNT_VALIDITY_DAYS ?? "30");
+const DISCOUNT_VALIDITY_DAYS = parseInt(process.env.DISCOUNT_VALIDITY_DAYS ?? "365");
 const DEFAULT_VOUCHER_VALIDITY_MONTHS = parseInt(
   process.env.DEFAULT_VOUCHER_VALIDITY_MONTHS ?? "12"
 );
@@ -214,7 +214,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
           shop,
           accessToken,
           discountCode,
-          meta.cantina_name,
+          item.vendor,
           DISCOUNT_VALIDITY_DAYS
         );
       }
