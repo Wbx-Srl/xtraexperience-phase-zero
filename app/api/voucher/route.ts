@@ -80,6 +80,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     experience_name: voucher.experience_name,
     image_url: voucher.image_url ?? "",
     url_experience: voucher.url_experience,
+    referrer: voucher.referrer ?? "",
     status: voucher.status,
     expires_at: voucher.expires_at,
   }, { headers: corsHeaders(req) });

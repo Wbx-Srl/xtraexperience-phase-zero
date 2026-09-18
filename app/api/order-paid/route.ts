@@ -234,6 +234,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         image_url: imageUrl,
         url_experience: meta.url,
         instructions: meta.instructions,
+        referrer: meta.referrer,
         discount_code: discountCode,
         discount_description: discountDescription,
         status: "generated",

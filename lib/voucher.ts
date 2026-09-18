@@ -71,6 +71,7 @@ export interface VoucherRecord {
   image_url: string;
   url_experience: string;
   instructions: string;
+  referrer: string;
   discount_code: string;
   discount_description: string;
   status: "generated" | "used" | "expired" | "refunded";
