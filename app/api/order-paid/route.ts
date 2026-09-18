@@ -204,20 +204,24 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       const meta = await getProductMetafields(shop, accessToken, item.product_id);
       const imageUrl = await getProductImage(shop, accessToken, item.product_id);
 
-      // g. Genera codice sconto cross-selling (uno per ordine per cantina, non per voucher)
-      const discountCode = generateDiscountCode(meta.cantina_name, orderId, salt);
+      // g. Genera codice sconto cross-selling - uno per voucher (line item +
+      // qty), non piu' condiviso per cantina/ordine: 2 esperienze della
+      // stessa cantina nello stesso ordine ricevono 2 codici distinti.
+      const discountCode = generateDiscountCode(
+        item.vendor,
+        orderId,
+        String(lineItemKey),
+        salt
+      );
       const discountDescription = `10% sui vini ${meta.cantina_name} — valido ${DISCOUNT_VALIDITY_DAYS} giorni, una sola volta`;
 
-      if (qty === 0) {
-        // Crea il discount code una sola volta per cantina per ordine
-        await createCrossSellingDiscount(
-          shop,
-          accessToken,
-          discountCode,
-          item.vendor,
-          DISCOUNT_VALIDITY_DAYS
-        );
-      }
+      await createCrossSellingDiscount(
+        shop,
+        accessToken,
+        discountCode,
+        item.vendor,
+        DISCOUNT_VALIDITY_DAYS
+      );
 
       const generatedAt = new Date().toISOString();
       const expiresAt = calculateVoucherExpiry(meta.validity_months);

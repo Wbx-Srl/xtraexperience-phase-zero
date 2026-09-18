@@ -40,20 +40,26 @@ export function generateVoucherCode(
 }
 
 /**
- * Genera codice sconto cross-selling nel formato {CANTINA_SLUG}-XW-{4CHAR}
+ * Genera codice sconto cross-selling nel formato {VENDOR_SLUG}-XW-{4CHAR}.
+ * Un codice per voucher (hash su orderId+lineItemId, non solo orderId+vendor):
+ * se un cliente compra piu' esperienze della stessa cantina nello stesso
+ * ordine, ognuna riceve un codice distinto invece di condividerne uno solo.
+ * vendor (non cantina_name/xpWineryName, metafield libero spesso vuoto) per
+ * evitare uno slug vuoto quando il metafield non e' compilato.
  */
 export function generateDiscountCode(
-  cantinaName: string,
+  vendor: string,
   orderId: string,
+  lineItemId: string,
   salt: string
 ): string {
-  const slug = cantinaName
+  const slug = vendor
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 10);
   const hash = crypto
     .createHmac("sha256", salt)
-    .update(`discount:${orderId}:${cantinaName}`)
+    .update(`discount:${orderId}:${lineItemId}`)
     .digest();
   const suffix = toCrockfordBase32(hash).slice(0, 4).toUpperCase();
   return `${slug}-XW-${suffix}`;
