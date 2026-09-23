@@ -50,7 +50,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const baseUrl = process.env.APP_BASE_URL!;
   const webhooks = [
     { topic: "orders/paid", address: `${baseUrl}/api/order-paid` },
-    { topic: "orders/refunded", address: `${baseUrl}/api/webhooks/orders-refunded` },
+    // "orders/refunded" non esiste come topic Shopify: il rimborso e' refunds/create
+    { topic: "refunds/create", address: `${baseUrl}/api/webhooks/refunds-create` },
     { topic: "orders/cancelled", address: `${baseUrl}/api/webhooks/orders-cancelled` },
     { topic: "customers/data_request", address: `${baseUrl}/api/gdpr/customers-data-request` },
     { topic: "customers/redact", address: `${baseUrl}/api/gdpr/customers-redact` },

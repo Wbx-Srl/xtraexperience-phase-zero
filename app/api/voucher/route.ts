@@ -40,6 +40,9 @@ function checkRateLimit(ip: string, maxPerMin = 20): boolean {
 /**
  * GET /api/voucher?code=XW-XXXX-XXXX
  * Lookup pubblico del voucher — usato dalla pagina /voucher e dai QR code.
+ * Gli errori hanno un campo "error_code" stabile (not_found, rate_limited,
+ * missing_code) che il tema usa per mostrare il testo nella lingua giusta;
+ * "error" resta per retrocompatibilita'.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const ip =
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
-      { error: "Troppe richieste. Riprova tra un minuto." },
+      { error: "Troppe richieste. Riprova tra un minuto.", error_code: "rate_limited" },
       { status: 429, headers: corsHeaders(req) }
     );
   }
@@ -55,7 +58,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const code = req.nextUrl.searchParams.get("code")?.toUpperCase().trim();
   if (!code) {
     return NextResponse.json(
-      { error: "Parametro code mancante" },
+      { error: "Parametro code mancante", error_code: "missing_code" },
       { status: 400, headers: corsHeaders(req) }
     );
   }
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const voucher = await kv.get<VoucherRecord>(`voucher:${code}`);
   if (!voucher) {
     return NextResponse.json(
-      { error: "Codice non trovato" },
+      { error: "Codice non trovato", error_code: "not_found" },
       { status: 404, headers: corsHeaders(req) }
     );
   }

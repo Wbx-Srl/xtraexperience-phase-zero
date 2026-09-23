@@ -87,6 +87,8 @@ export interface VoucherRecord {
   customer_name: string;
   order_number: string;
   payment_gateway: string;
+  // Valorizzato dai webhook orders/cancelled e refunds/create (lib/refund.ts)
+  refunded_at?: string;
 }
 
 export interface OrderVoucherSummary {
@@ -96,4 +98,6 @@ export interface OrderVoucherSummary {
   experience_name: string;
   expires_at: string;
   status: string;
+  // Letto anche dall'ERP via /api/order-vouchers
+  refunded_at?: string;
 }

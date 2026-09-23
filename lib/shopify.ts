@@ -270,6 +270,92 @@ export async function createCrossSellingDiscount(
   }
 }
 
+/**
+ * Elimina il codice sconto cross-selling di un voucher annullato/rimborsato.
+ * Il price_rule_id non e' salvato nel VoucherRecord, quindi si risale dal
+ * codice (discount_codes/lookup, che risponde con redirect al discount code).
+ * Ogni price rule contiene un solo codice (uno per voucher, vedi
+ * generateDiscountCode), quindi si elimina l'intera price rule.
+ * Best effort: logga e non lancia, codice gia' eliminato = nessuna azione.
+ */
+export async function deleteCrossSellingDiscount(
+  shop: string,
+  accessToken: string,
+  discountCode: string
+): Promise<void> {
+  const lookupRes = await shopifyFetch(
+    shop,
+    accessToken,
+    `discount_codes/lookup.json?code=${encodeURIComponent(discountCode)}`
+  );
+  if (lookupRes.status === 404) {
+    console.log(`Codice sconto ${discountCode} non trovato (gia' eliminato?), skip.`);
+    return;
+  }
+  if (!lookupRes.ok) {
+    console.error(`Lookup codice sconto ${discountCode} fallito: ${lookupRes.status} ${await lookupRes.text()}`);
+    return;
+  }
+  const lookupData = await lookupRes.json();
+  const priceRuleId = lookupData.discount_code?.price_rule_id;
+  if (!priceRuleId) {
+    console.error(`Lookup codice sconto ${discountCode}: price_rule_id assente nella risposta.`);
+    return;
+  }
+
+  const deleteRes = await shopifyFetch(shop, accessToken, `price_rules/${priceRuleId}.json`, {
+    method: "DELETE",
+  });
+  if (!deleteRes.ok && deleteRes.status !== 404) {
+    console.error(`Eliminazione price rule ${priceRuleId} (${discountCode}) fallita: ${deleteRes.status} ${await deleteRes.text()}`);
+    return;
+  }
+  console.log(`Codice sconto ${discountCode} eliminato (price rule ${priceRuleId}).`);
+}
+
+/**
+ * Aggiorna lo status dei voucher annullati nel metafield ordine
+ * xw_experience.vouchers (scritto da writeOrderMetafield). Best effort:
+ * il KV resta la source of truth.
+ */
+export async function markOrderMetafieldVouchersRefunded(
+  shop: string,
+  accessToken: string,
+  orderId: string,
+  codes: string[],
+  refundedAt: string
+): Promise<void> {
+  const res = await shopifyFetch(
+    shop,
+    accessToken,
+    `orders/${orderId}/metafields.json?namespace=xw_experience&key=vouchers`
+  );
+  if (!res.ok) throw new Error(`Order metafield read failed: ${res.status}`);
+  const data = await res.json();
+  const metafield = (data.metafields ?? [])[0] as { id: number; value: string } | undefined;
+  if (!metafield) return;
+
+  const vouchers = JSON.parse(metafield.value) as { code: string; status: string; refunded_at?: string }[];
+  const updated = vouchers.map((v) =>
+    codes.includes(v.code) ? { ...v, status: "refunded", refunded_at: refundedAt } : v
+  );
+
+  const putRes = await shopifyFetch(
+    shop,
+    accessToken,
+    `orders/${orderId}/metafields/${metafield.id}.json`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        metafield: { id: metafield.id, type: "json", value: JSON.stringify(updated) },
+      }),
+    }
+  );
+  if (!putRes.ok) {
+    throw new Error(`Order metafield update failed: ${putRes.status} ${await putRes.text()}`);
+  }
+}
+
 // ── Registrazione webhook ─────────────────────────────────────────────────────
 
 export async function registerWebhook(
@@ -278,10 +364,16 @@ export async function registerWebhook(
   topic: string,
   address: string
 ): Promise<void> {
-  await shopifyFetch(shop, accessToken, "webhooks.json", {
+  const res = await shopifyFetch(shop, accessToken, "webhooks.json", {
     method: "POST",
     body: JSON.stringify({
       webhook: { topic, address, format: "json" },
     }),
   });
+  // Prima la risposta era ignorata: un topic non valido ("orders/refunded",
+  // che non esiste) falliva senza lasciare traccia. 422 con subscription
+  // gia' esistente per topic+address e' atteso alle reinstallazioni.
+  if (!res.ok) {
+    console.error(`Registrazione webhook ${topic} -> ${address} fallita: ${res.status} ${await res.text()}`);
+  }
 }
