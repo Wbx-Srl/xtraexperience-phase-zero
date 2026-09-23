@@ -1,0 +1,27 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "c83726243ed661a592c8ea583fa0bb0c"
+application_url = "https://xtraexperience-phase-zero.vercel.app"
+embedded = false
+name = "XtraExperience"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_price_rules,write_discounts,read_orders,write_orders,read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://xtraexperience-phase-zero.vercel.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-07"
+
+# Rimborsi (anche parziali) -> annullamento voucher Xperience + codice sconto.
+# orders/paid e orders/cancelled restano registrati via API nel callback OAuth
+# (app/api/auth/callback/route.ts): non duplicarli qui.
+[[webhooks.subscriptions]]
+topics = [ "refunds/create" ]
+uri = "https://xtraexperience-phase-zero.vercel.app/api/webhooks/refunds-create"
