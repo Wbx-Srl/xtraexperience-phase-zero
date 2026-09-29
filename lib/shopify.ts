@@ -182,11 +182,85 @@ async function getVendorProductIds(
   return products.map((p) => p.id);
 }
 
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/[‘’]/g, "'");
+}
+
+function handleize(value: string): string {
+  return normalizeName(value)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Risolve l'id della collection del produttore (cantina) tra le collection
+ * del prodotto Xperience acquistato. Il tema la trova confrontando
+ * xtrawine.entityId della collection con il campo "key" del metaobject
+ * vendorMetaobject del prodotto, ma l'app non ha lo scope read_metaobjects:
+ * qui si sceglie la collection con xtrawine.entityId valorizzato (le
+ * collection produttore e zona ce l'hanno, le altre no) il cui titolo o
+ * handle corrisponde al vendor (es. "Tasca d'Almerita" / tasca-d-almerita).
+ * Ritorna null se non la trova: il chiamante torna alla lista di prodotti.
+ */
+async function getProducerCollectionId(
+  shop: string,
+  accessToken: string,
+  productId: string,
+  vendor: string
+): Promise<number | null> {
+  const res = await shopifyFetch(shop, accessToken, "graphql.json", {
+    method: "POST",
+    body: JSON.stringify({
+      query: `query ProducerCollections($id: ID!) {
+        product(id: $id) {
+          collections(first: 250) {
+            nodes {
+              legacyResourceId
+              title
+              handle
+              entityId: metafield(namespace: "xtrawine", key: "entityId") {
+                value
+              }
+            }
+          }
+        }
+      }`,
+      variables: { id: `gid://shopify/Product/${productId}` },
+    }),
+  });
+  if (!res.ok) {
+    console.error(`Lookup collection produttore per prodotto ${productId} fallito: ${res.status}`);
+    return null;
+  }
+  const data = await res.json();
+  if (data.errors) {
+    console.error(`Lookup collection produttore per prodotto ${productId}: ${JSON.stringify(data.errors)}`);
+    return null;
+  }
+  const nodes = (data.data?.product?.collections?.nodes ?? []) as {
+    legacyResourceId: string;
+    title: string;
+    handle: string;
+    entityId: { value: string } | null;
+  }[];
+  const vendorName = normalizeName(vendor);
+  const vendorHandle = handleize(vendor);
+  const match = nodes.find(
+    (c) =>
+      c.entityId?.value &&
+      (normalizeName(c.title) === vendorName || c.handle === vendorHandle)
+  );
+  return match ? Number(match.legacyResourceId) : null;
+}
+
 export async function createCrossSellingDiscount(
   shop: string,
   accessToken: string,
   discountCode: string,
   vendor: string,
+  productId: string,
   validityDays: number
 ): Promise<void> {
   const startsAt = new Date().toISOString();
@@ -194,15 +268,27 @@ export async function createCrossSellingDiscount(
     Date.now() + validityDays * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  // Limita lo sconto ai soli prodotti della cantina (stesso vendor Shopify
-  // del prodotto Xperience acquistato) - prima era target_selection:"all",
-  // valido su tutto il catalogo.
-  const entitledProductIds = await getVendorProductIds(shop, accessToken, vendor);
-  if (entitledProductIds.length === 0) {
+  // Sconto sulla collection del produttore (cantina), cosi' vale anche sui
+  // prodotti che entrano nel catalogo durante l'anno di validita' e non ha
+  // il limite di 100 entitled_product_ids. Se la collection non si trova,
+  // resta il comportamento precedente: vini attivi del vendor al momento
+  // dell'ordine.
+  const collectionId = await getProducerCollectionId(shop, accessToken, productId, vendor);
+  let entitlement: { entitled_collection_ids: number[] } | { entitled_product_ids: number[] };
+  if (collectionId) {
+    entitlement = { entitled_collection_ids: [collectionId] };
+  } else {
     console.error(
-      `Nessun prodotto trovato per vendor "${vendor}" - sconto cross-selling non creato.`
+      `Collection produttore non trovata per vendor "${vendor}" (prodotto ${productId}) - sconto sui vini del vendor.`
     );
-    return;
+    const entitledProductIds = await getVendorProductIds(shop, accessToken, vendor);
+    if (entitledProductIds.length === 0) {
+      console.error(
+        `Nessun prodotto trovato per vendor "${vendor}" - sconto cross-selling non creato.`
+      );
+      return;
+    }
+    entitlement = { entitled_product_ids: entitledProductIds };
   }
 
   // Crea price rule
@@ -217,7 +303,7 @@ export async function createCrossSellingDiscount(
           title: discountCode,
           target_type: "line_item",
           target_selection: "entitled",
-          entitled_product_ids: entitledProductIds,
+          ...entitlement,
           allocation_method: "across",
           value_type: "percentage",
           value: "-10.0",

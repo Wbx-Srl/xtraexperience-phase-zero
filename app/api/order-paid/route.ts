@@ -213,13 +213,14 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         String(lineItemKey),
         salt
       );
-      const discountDescription = `10% sui vini ${meta.cantina_name} — valido ${DISCOUNT_VALIDITY_DAYS} giorni, una sola volta`;
+      const discountDescription = `10% sui prodotti ${meta.cantina_name} — valido ${DISCOUNT_VALIDITY_DAYS} giorni, una sola volta`;
 
       await createCrossSellingDiscount(
         shop,
         accessToken,
         discountCode,
         item.vendor,
+        String(item.product_id),
         DISCOUNT_VALIDITY_DAYS
       );
 
