@@ -84,6 +84,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     image_url: voucher.image_url ?? "",
     url_experience: voucher.url_experience,
     referrer: voucher.referrer ?? "",
+    instructions: voucher.instructions ?? "",
+    driving_directions: voucher.driving_directions ?? "",
     status: voucher.status,
     expires_at: voucher.expires_at,
   }, { headers: corsHeaders(req) });

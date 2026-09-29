@@ -77,6 +77,8 @@ export interface VoucherRecord {
   image_url: string;
   url_experience: string;
   instructions: string;
+  // Assente nei voucher generati prima che venisse salvato nel record
+  driving_directions?: string;
   referrer: string;
   discount_code: string;
   discount_description: string;
