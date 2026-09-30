@@ -236,6 +236,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         cantina_phone: meta.cantina_phone,
         cantina_address: meta.cantina_address,
         experience_name: item.title,
+        product_id: String(item.product_id),
         image_url: imageUrl,
         url_experience: meta.url,
         instructions: meta.instructions,

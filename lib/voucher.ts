@@ -74,6 +74,9 @@ export interface VoucherRecord {
   cantina_phone: string;
   cantina_address: string;
   experience_name: string;
+  // Assente nei voucher generati prima che venisse salvato nel record: serve
+  // al popup del tema per leggere titolo e metafield tradotti (Storefront API)
+  product_id?: string;
   image_url: string;
   url_experience: string;
   instructions: string;
