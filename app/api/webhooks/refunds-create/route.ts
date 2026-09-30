@@ -10,8 +10,9 @@ interface ShopifyRefund {
 
 /**
  * POST /api/webhooks/refunds-create
- * Riceve webhook refunds/create da Shopify (anche rimborsi parziali): annulla
- * solo i voucher delle righe/quantita' rimborsate e i relativi codici sconto.
+ * Riceve webhook refunds/create da Shopify: annulla i voucher delle righe
+ * rimborsate per intero e i relativi codici sconto. Un rimborso parziale di
+ * una riga non annulla nulla: il seriale lo indica l'ERP (/api/voucher-cancel).
  * Un rimborso solo di importo (senza refund_line_items) non annulla nulla.
  * Risponde 200 SUBITO, poi processa in background.
  */

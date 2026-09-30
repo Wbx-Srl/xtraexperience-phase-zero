@@ -8,11 +8,13 @@ import type { VoucherRecord, OrderVoucherSummary } from "@/lib/voucher";
 /**
  * Quali voucher annullare:
  * - "all": ordine annullato (orders/cancelled), tutti i voucher dell'ordine
- * - "line_items": rimborso (refunds/create), solo le righe/quantita' rimborsate
+ * - "line_items": rimborso (refunds/create), solo le righe rimborsate per intero
+ * - "codes": annullamento puntuale chiesto dall'ERP (/api/voucher-cancel)
  */
 export type RefundScope =
   | { type: "all" }
-  | { type: "line_items"; items: { line_item_id: string; quantity: number }[] };
+  | { type: "line_items"; items: { line_item_id: string; quantity: number }[] }
+  | { type: "codes"; codes: string[] };
 
 // Annullamento con rimborso in Admin manda orders/cancelled e refunds/create
 // quasi insieme: entrambi fanno read-modify-write su order:${orderId}, quindi
@@ -36,24 +38,36 @@ async function acquireLock(key: string): Promise<boolean> {
 
 /**
  * Sceglie i codici voucher da annullare. Con quantity > 1 sulla stessa riga
- * i voucher condividono line_item_id (normalizzato, vedi order-paid) e sono
- * in ordine di generazione: si annullano gli ULTIMI generati tra quelli non
- * ancora annullati (decisione 9666a4bc).
+ * i voucher condividono line_item_id (normalizzato, vedi order-paid).
+ * Rimborso: si annulla solo se copre tutti i voucher ancora attivi della
+ * riga. Su un rimborso parziale non si sa quale voucher e' stato distribuito,
+ * quindi non si annulla nulla e si aspetta che l'ERP indichi il seriale.
  */
 function selectCodesToRefund(
   summaries: OrderVoucherSummary[],
-  scope: RefundScope
+  scope: RefundScope,
+  orderId: string,
+  source: string
 ): string[] {
   const active = summaries.filter((s) => s.status !== "refunded");
   if (scope.type === "all") return active.map((s) => s.code);
+  if (scope.type === "codes") {
+    return active.filter((s) => scope.codes.includes(s.code)).map((s) => s.code);
+  }
 
   const selected: string[] = [];
   for (const item of scope.items) {
     if (item.quantity <= 0) continue;
-    const candidates = active.filter(
-      (s) => s.line_item_id === item.line_item_id && !selected.includes(s.code)
-    );
-    selected.push(...candidates.slice(-item.quantity).map((s) => s.code));
+    const candidates = active.filter((s) => s.line_item_id === item.line_item_id);
+    if (candidates.length === 0) continue;
+    if (item.quantity >= candidates.length) {
+      selected.push(...candidates.map((s) => s.code));
+    } else {
+      console.log(
+        `[${source}] Ordine ${orderId} riga ${item.line_item_id}: rimborso parziale ` +
+          `(${item.quantity}/${candidates.length} voucher attivi), si attende la chiamata ERP col seriale.`
+      );
+    }
   }
   return selected;
 }
@@ -90,7 +104,7 @@ export async function refundOrderVouchers(
       return;
     }
 
-    const codes = selectCodesToRefund(summaries, scope);
+    const codes = selectCodesToRefund(summaries, scope, orderId, source);
     if (codes.length === 0) {
       console.log(`[${source}] Ordine ${orderId}: nessun voucher da annullare.`);
       return;
