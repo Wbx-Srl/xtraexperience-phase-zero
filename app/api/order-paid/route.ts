@@ -8,10 +8,14 @@ import {
   getProductImage,
   writeOrderMetafield,
   createCrossSellingDiscount,
+  getProductTranslations,
+  VOUCHER_EMAIL_LANGUAGES,
 } from "@/lib/shopify";
+import type { ProductTranslation, VoucherEmailLanguage } from "@/lib/shopify";
 import { generateVoucherCode, generateDiscountCode } from "@/lib/voucher";
 import type { VoucherRecord, OrderVoucherSummary } from "@/lib/voucher";
 import { trackVoucherGenerated, trackVoucherSold } from "@/lib/klaviyo";
+import type { VoucherTranslatedFields } from "@/lib/klaviyo";
 
 const EXPERIENCE_PRODUCT_TYPE = process.env.EXPERIENCE_PRODUCT_TYPE ?? "Experience";
 const PAYPAL_DELAY_MS = parseInt(process.env.PAYPAL_DELAY_MINUTES ?? "30") * 60 * 1000;
@@ -79,10 +83,36 @@ interface ShopifyOrder {
   line_items: ShopifyLineItem[];
   payment_gateway: string;
   created_at: string;
+  // Lingua della vetrina in cui e' stato fatto l'ordine (es. "it", "en", "de")
+  customer_locale?: string;
 }
 
 function normalizeLineItemId(lineItemId: string): string {
   return lineItemId.replace(/-\d+$/, "");
+}
+
+/**
+ * Lingua dei campi senza suffisso dell'evento "Voucher Generated": IT per gli
+ * ordini fatti in italiano, EN per tutti gli altri (i template Klaviyo sono
+ * due, ITA ed ENG). Il flow sceglie il template dalla lingua del profilo, qui
+ * si usa quella dell'ordine: se differiscono, il template ITA puo' mostrare
+ * testo EN finche' i template non passano ai campi _it/_en.
+ */
+function voucherEmailLanguage(customerLocale: string | undefined): VoucherEmailLanguage {
+  return customerLocale?.toLowerCase().startsWith("it") ? "it" : "en";
+}
+
+/** Campi tradotti con suffisso di lingua (experience_name_it, ...). */
+function translatedVoucherFields(
+  translations: Record<VoucherEmailLanguage, ProductTranslation>
+): VoucherTranslatedFields {
+  const fields: Record<string, string> = {};
+  for (const language of VOUCHER_EMAIL_LANGUAGES) {
+    for (const [field, value] of Object.entries(translations[language])) {
+      fields[`${field}_${language}`] = value;
+    }
+  }
+  return fields as VoucherTranslatedFields;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -180,6 +210,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
     .filter(Boolean)
     .join(" ") || "Cliente";
   const isPaypal = order.payment_gateway === "paypal";
+  const emailLanguage = voucherEmailLanguage(order.customer_locale);
 
   const orderVoucherSummaries: OrderVoucherSummary[] = [];
   const voucherRecordsForMetafield: object[] = [];
@@ -187,6 +218,10 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
 
   // 7. Loop line_items experience
   for (const item of experienceItems) {
+    // Testi tradotti per l'email Klaviyo: letti una volta per riga d'ordine
+    // (non per ogni unita'), alla prima unita' ancora da processare.
+    let translations: Record<VoucherEmailLanguage, ProductTranslation> | null = null;
+
     // Genera N voucher se quantity > 1
     for (let qty = 0; qty < item.quantity; qty++) {
       const lineItemKey = qty === 0 ? item.id : `${item.id}-${qty}`;
@@ -203,6 +238,14 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       // c-f. Leggi metafield prodotto
       const meta = await getProductMetafields(shop, accessToken, item.product_id);
       const imageUrl = await getProductImage(shop, accessToken, item.product_id);
+      translations ??= await getProductTranslations(shop, String(item.product_id), {
+        experience_name: item.title,
+        instructions: meta.instructions,
+        driving_directions: meta.driving_directions,
+        cantina_address: meta.cantina_address,
+      });
+      const localized = translations[emailLanguage];
+      const translatedFields = translatedVoucherFields(translations);
 
       // g. Genera codice sconto cross-selling - uno per voucher (line item +
       // qty), non piu' condiviso per cantina/ordine: 2 esperienze della
@@ -283,24 +326,30 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
         const klaviyoKey = process.env.KLAVIYO_API_KEY!;
         const qrUrl = `${APP_BASE_URL}/voucher?code=${code}`;
 
+        // Campi senza suffisso nella lingua dell'ordine (IT/EN), cosi' i
+        // template Klaviyo di oggi mostrano il testo tradotto senza modifiche;
+        // i campi _it/_en restano a disposizione dei template. KV e metafield
+        // ordine tengono il valore base.
         await trackVoucherGenerated(klaviyoKey, customerEmail, {
           code,
           cantina_name: meta.cantina_name,
           cantina_email: meta.cantina_email,
           cantina_phone: meta.cantina_phone,
-          cantina_address: meta.cantina_address,
-          experience_name: item.title,
+          cantina_address: localized.cantina_address,
+          experience_name: localized.experience_name,
           image_url: imageUrl,
           url_experience: meta.url,
           expires_at: formatExpiryDateForEmail(expiresAt),
           qr_url: qrUrl,
           order_number: orderNumber,
-          instructions: meta.instructions,
-          driving_directions: meta.driving_directions,
+          instructions: localized.instructions,
+          driving_directions: localized.driving_directions,
           referrer: meta.referrer,
           discount_code: discountCode,
           discount_description: discountDescription,
           payment_gateway: order.payment_gateway,
+          locale: order.customer_locale ?? "",
+          ...translatedFields,
         });
         console.log(`Klaviyo VoucherGenerated inviato per ${code} → ${customerEmail}`);
 

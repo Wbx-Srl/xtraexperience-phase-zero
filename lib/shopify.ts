@@ -86,6 +86,113 @@ export async function getProductMetafields(
   };
 }
 
+// ── Traduzioni prodotto (email voucher Klaviyo) ───────────────────────────────
+
+// L'Admin REST di getProductMetafields restituisce solo la lingua base del
+// negozio: le traduzioni di Translate & Adapt si leggono dalla Storefront API
+// con @inContext, come fa il popup voucher del tema. Token Storefront pubblico
+// (lo stesso del tema), nessuno scope Admin in piu'.
+const STOREFRONT_API_VERSION = "2026-04";
+
+// Lingue mandate a Klaviyo come campi con suffisso (experience_name_it, ...).
+// Aggiungere una lingua = aggiungere il codice qui.
+export const VOUCHER_EMAIL_LANGUAGES = ["it", "en"] as const;
+export type VoucherEmailLanguage = (typeof VOUCHER_EMAIL_LANGUAGES)[number];
+
+export interface ProductTranslation {
+  experience_name: string;
+  instructions: string;
+  driving_directions: string;
+  cantina_address: string;
+}
+
+async function getProductTranslation(
+  shop: string,
+  storefrontToken: string,
+  productId: string,
+  language: VoucherEmailLanguage,
+  fallback: ProductTranslation
+): Promise<ProductTranslation> {
+  const res = await fetch(`https://${shop}/api/${STOREFRONT_API_VERSION}/graphql.json`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Storefront-Access-Token": storefrontToken,
+    },
+    body: JSON.stringify({
+      query: `query VoucherTranslations($id: ID!, $language: LanguageCode!)
+        @inContext(language: $language) {
+        product(id: $id) {
+          title
+          instructions: metafield(namespace: "xtrawine", key: "xpBookingInstructions") { value }
+          directions: metafield(namespace: "xtrawine", key: "xpDrivingDirections") { value }
+          address: metafield(namespace: "xtrawine", key: "xpAddress") { value }
+        }
+      }`,
+      variables: {
+        id: `gid://shopify/Product/${productId}`,
+        language: language.toUpperCase(),
+      },
+    }),
+  });
+  if (!res.ok) {
+    console.error(`Traduzione ${language} prodotto ${productId} fallita: ${res.status}`);
+    return fallback;
+  }
+  const data = await res.json();
+  if (data.errors) {
+    console.error(`Traduzione ${language} prodotto ${productId}: ${JSON.stringify(data.errors)}`);
+    return fallback;
+  }
+  const product = data.data?.product as {
+    title?: string;
+    instructions: { value: string } | null;
+    directions: { value: string } | null;
+    address: { value: string } | null;
+  } | null;
+  if (!product) {
+    console.error(`Traduzione ${language} prodotto ${productId}: prodotto non visibile sulla Storefront`);
+    return fallback;
+  }
+  return {
+    experience_name: product.title || fallback.experience_name,
+    instructions: product.instructions?.value || fallback.instructions,
+    driving_directions: product.directions?.value || fallback.driving_directions,
+    cantina_address: product.address?.value || fallback.cantina_address,
+  };
+}
+
+/**
+ * Testi del prodotto tradotti in ogni lingua di VOUCHER_EMAIL_LANGUAGES.
+ * Best effort: senza token, con errore o campo vuoto si usa il valore base
+ * (fallback), cioe' l'email resta com'era prima delle traduzioni.
+ */
+export async function getProductTranslations(
+  shop: string,
+  productId: string,
+  fallback: ProductTranslation
+): Promise<Record<VoucherEmailLanguage, ProductTranslation>> {
+  const storefrontToken = process.env.SHOPIFY_STOREFRONT_TOKEN;
+  if (!storefrontToken) {
+    console.error("SHOPIFY_STOREFRONT_TOKEN mancante: email voucher nella lingua base.");
+  }
+  const entries = await Promise.all(
+    VOUCHER_EMAIL_LANGUAGES.map(async (language) => {
+      if (!storefrontToken) return [language, fallback] as const;
+      try {
+        return [
+          language,
+          await getProductTranslation(shop, storefrontToken, productId, language, fallback),
+        ] as const;
+      } catch (e) {
+        console.error(`Traduzione ${language} prodotto ${productId} fallita:`, e);
+        return [language, fallback] as const;
+      }
+    })
+  );
+  return Object.fromEntries(entries) as Record<VoucherEmailLanguage, ProductTranslation>;
+}
+
 // ── Tipo prodotto (fallback quando product_type è vuoto nel webhook) ────────────
 
 export async function getProductType(

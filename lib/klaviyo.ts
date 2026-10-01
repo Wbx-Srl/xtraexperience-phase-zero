@@ -1,3 +1,5 @@
+import type { ProductTranslation, VoucherEmailLanguage } from "@/lib/shopify";
+
 const KLAVIYO_API_URL = "https://a.klaviyo.com/api/events/";
 
 async function trackEvent(
@@ -37,7 +39,17 @@ async function trackEvent(
   }
 }
 
-export interface VoucherGeneratedPayload extends Record<string, string> {
+// Campi tradotti mandati anche con suffisso di lingua (experience_name_it,
+// experience_name_en, ...), per i template Klaviyo divisi per lingua.
+export type TranslatedVoucherField = keyof ProductTranslation;
+
+export type VoucherTranslatedFields = {
+  [K in `${TranslatedVoucherField}_${VoucherEmailLanguage}`]: string;
+};
+
+export type VoucherGeneratedPayload = VoucherGeneratedBasePayload & VoucherTranslatedFields;
+
+interface VoucherGeneratedBasePayload extends Record<string, string> {
   code: string;
   cantina_name: string;
   cantina_email: string;
@@ -55,6 +67,8 @@ export interface VoucherGeneratedPayload extends Record<string, string> {
   discount_code: string;
   discount_description: string;
   payment_gateway: string;
+  // Lingua dell'ordine (order.customer_locale, es. "it", "en", "de")
+  locale: string;
 }
 
 export interface VoucherSoldPayload extends Record<string, string> {
