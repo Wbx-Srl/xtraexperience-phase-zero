@@ -236,7 +236,7 @@ async function processOrder(shop: string, order: ShopifyOrder): Promise<void> {
       const code = generateVoucherCode(orderId, String(lineItemKey), salt);
 
       // c-f. Leggi metafield prodotto
-      const meta = await getProductMetafields(shop, accessToken, item.product_id);
+      const meta = await getProductMetafields(shop, accessToken, item.product_id, item.vendor);
       const imageUrl = await getProductImage(shop, accessToken, item.product_id);
       translations ??= await getProductTranslations(shop, String(item.product_id), {
         experience_name: item.title,

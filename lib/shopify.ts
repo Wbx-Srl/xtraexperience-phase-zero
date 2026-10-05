@@ -39,7 +39,9 @@ export interface ProductMetafields {
 export async function getProductMetafields(
   shop: string,
   accessToken: string,
-  productId: string
+  productId: string,
+  // Produttore della riga d'ordine: nome cantina quando xpWineryName e' vuoto
+  vendor = ""
 ): Promise<ProductMetafields> {
   // cantina_name/url/instructions live in the xw_experience namespace
   // (dedicated to this app); booking email/phone are theme-wide fields
@@ -75,7 +77,7 @@ export async function getProductMetafields(
 
   return {
     url: mf["url"] ?? "",
-    cantina_name: xtrawineMf["xpWineryName"] ?? "",
+    cantina_name: xtrawineMf["xpWineryName"] || vendor,
     cantina_email: xtrawineMf["xpBookingEMail"] ?? "",
     cantina_phone: xtrawineMf["xpBookingPhone"] ?? "",
     cantina_address: xtrawineMf["xpAddress"] ?? "",
